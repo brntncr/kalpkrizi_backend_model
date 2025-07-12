@@ -1,17 +1,36 @@
 from fastapi import FastAPI, Depends
+from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 import numpy as np
 import pandas as pd
 import pickle
 import os
+import logging
 from sqlalchemy import Column, Integer, Float, DateTime, create_engine
 from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.orm import sessionmaker, Session
 from datetime import datetime
 
+# Initialize FastAPI app
 app = FastAPI()
 
-# 📦 Model ve yardımcı dosyaları yükleme
+# Setup CORS (allow all origins for now; restrict in prod!)
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
+
+# Setup logging
+logging.basicConfig(
+    level=logging.INFO,
+    format="%(asctime)s [%(levelname)s] %(name)s - %(message)s",
+)
+logger = logging.getLogger(__name__)
+
+# 📦 Model and helper files
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 MODEL_PATH = os.path.join(BASE_DIR, "..", "models", "model.pkl")
 SCALER_PATH = os.path.join(BASE_DIR, "..", "models", "scaler.pkl")
@@ -29,7 +48,7 @@ with open(FEATURES_PATH, "rb") as f:
 NUMERIC_COLS = ['age', 'trtbps', 'chol', 'thalachh', 'oldpeak']
 CATEGORICAL_COLS = ['sex', 'cp', 'fbs', 'restecg', 'exng', 'slp', 'caa', 'thall']
 
-# 🔹 Railway Postgres DB bağlantısı (env’den alıyoruz)
+# 🔹 Database connection
 DATABASE_URL = os.getenv("DATABASE_URL")
 assert DATABASE_URL is not None, "DATABASE_URL environment variable must be set!"
 
@@ -56,7 +75,6 @@ class PredictionRecord(Base):
     thall = Column(Integer)
     prediction = Column(Integer)
 
-# 🔹 Railway deploy sonrası ilk çalışmada tabloyu yaratır
 Base.metadata.create_all(bind=engine)
 
 def get_db():
@@ -87,6 +105,8 @@ async def root():
 
 @app.post("/predict")
 async def predict(data: HeartAttackInput, db: Session = Depends(get_db)):
+    logger.info(f"Received request with data: {data.dict()}")
+
     input_dict = data.dict()
     df_input = pd.DataFrame([input_dict])
     df_encoded = pd.get_dummies(df_input, columns=CATEGORICAL_COLS, drop_first=True)
@@ -110,5 +130,7 @@ async def predict(data: HeartAttackInput, db: Session = Depends(get_db)):
     )
     db.add(record)
     db.commit()
+
+    logger.info(f"Prediction result: {pred}")
 
     return {"prediction": int(pred)}
