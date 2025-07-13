@@ -1,8 +1,9 @@
 fastapi
 uvicorn
+sqlalchemy
+pydantic
 numpy
 pandas
 scikit-learn
-pydantic
-sqlalchemy
-psycopg2-binary
+python-dotenv
+requests
