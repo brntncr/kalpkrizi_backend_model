@@ -133,14 +133,14 @@ async def predict(
     pred = model.predict(df_encoded)[0]
     pred_proba = model.predict_proba(df_encoded)[0][1]
 
-    record = PredictionRecord(
-        age=data.age, sex=data.sex, cp=data.cp, trtbps=data.trtbps, chol=data.chol,
-        fbs=data.fbs, restecg=data.restecg, thalachh=data.thalachh, exng=data.exng,
-        oldpeak=data.oldpeak, slp=data.slp, caa=data.caa, thall=data.thall,
-        prediction=int(pred)
-    )
-    db.add(record)
-    db.commit()
+    # record = PredictionRecord(
+    #     age=data.age, sex=data.sex, cp=data.cp, trtbps=data.trtbps, chol=data.chol,
+    #     fbs=data.fbs, restecg=data.restecg, thalachh=data.thalachh, exng=data.exng,
+    #     oldpeak=data.oldpeak, slp=data.slp, caa=data.caa, thall=data.thall,
+    #     prediction=int(pred)
+    # )
+    # db.add(record)
+    # db.commit()
 
     logger.info(f"Prediction: {pred} (probability: {pred_proba:.2%})")
 
