@@ -11,6 +11,7 @@ from sqlalchemy import Column, Integer, Float, DateTime, create_engine
 from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.orm import sessionmaker, Session
 from datetime import datetime
+from app.custom_transformers import FeatureEngineer
 
 # Initialize FastAPI app
 app = FastAPI()
@@ -34,6 +35,8 @@ logger = logging.getLogger(__name__)
 # 📦 Model files and helpers
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 PIPELINE_PATH = os.path.join(BASE_DIR, "..", "models", "pipeline.pkl")
+
+from app.custom_transformers import FeatureEngineer  # ✅ pipeline içindeki sınıf için gerekli
 
 with open(PIPELINE_PATH, "rb") as f:
     pipeline = pickle.load(f)

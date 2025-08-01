@@ -1,5 +1,10 @@
 import pandas as pd
 import pickle
+import sys
+import os
+
+# ✅ Yol ayarı (app import'u için)
+sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
 
 from sklearn.base import BaseEstimator, TransformerMixin
 from sklearn.pipeline import Pipeline
@@ -7,21 +12,7 @@ from sklearn.compose import ColumnTransformer
 from sklearn.preprocessing import StandardScaler, OneHotEncoder
 from sklearn.linear_model import LogisticRegression
 
-# 🔹 Özellik mühendisliği class'ı
-class FeatureEngineer(BaseEstimator, TransformerMixin):
-    def fit(self, X, y=None):
-        return self
-    def transform(self, X):
-        X = X.copy()
-        X["yas_grubu"] = pd.cut(X["age"], bins=[0,40,55,70,100], labels=["<40", "40-55", "56-70", ">70"])
-        X["oldpeak_yuksek"] = (X["oldpeak"] > 2.0).astype(int)
-        X["egim_flat_veya_down"] = X["slp"].isin([1, 2]).astype(int)
-        X["sessiz_gogus_agrisi"] = (X["cp"] == 4).astype(int)
-        X["thal_geri_donen_defekt"] = (X["thall"] == 2).astype(int)
-        X["exng_oldpeak_carpim"] = X["exng"] * X["oldpeak"]
-        X["thalach_age_orani"] = X["thalachh"] / X["age"]
-        X["risk_skoru_light"] = X["age"] + X["trtbps"] + X["chol"] + X["oldpeak"] - X["thalachh"]
-        return X
+from app.custom_transformers import FeatureEngineer
 
 # 🔹 Kullanılacak sütunlar
 numeric_cols = ["age", "trtbps", "chol", "thalachh", "oldpeak", 
@@ -51,13 +42,17 @@ full_pipeline = Pipeline(steps=[
     ))
 ])
 
+# ✅ Dosya yolu ayarı
+BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+csv_path = os.path.join(BASE_DIR, "heart.csv")
+
 # 🔹 Veri yükleme
-df = pd.read_csv("heart.csv")
+df = pd.read_csv(csv_path)
 X = df.drop(columns=["output"])
 y = df["output"]
 
 # 🔹 Eğit ve kaydet
 full_pipeline.fit(X, y)
 
-with open("pipeline.pkl", "wb") as f:
+with open(os.path.join(BASE_DIR, "pipeline.pkl"), "wb") as f:
     pickle.dump(full_pipeline, f)
