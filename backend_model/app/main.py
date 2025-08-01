@@ -36,8 +36,6 @@ logger = logging.getLogger(__name__)
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 PIPELINE_PATH = os.path.join(BASE_DIR, "..", "models", "pipeline.pkl")
 
-from app.custom_transformers import FeatureEngineer  # ✅ pipeline içindeki sınıf için gerekli
-
 with open(PIPELINE_PATH, "rb") as f:
     pipeline = pickle.load(f)
 
