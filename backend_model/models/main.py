@@ -56,3 +56,9 @@ full_pipeline.fit(X, y)
 
 with open(os.path.join(BASE_DIR, "pipeline.pkl"), "wb") as f:
     pickle.dump(full_pipeline, f)
+
+
+import subprocess
+
+with open("versions.txt", "w") as f:
+    subprocess.run(["pip", "freeze"], stdout=f)
