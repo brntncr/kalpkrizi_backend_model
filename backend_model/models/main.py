@@ -1,50 +1,63 @@
 import pandas as pd
-import numpy as np
-import seaborn as sns
-import matplotlib.pyplot as plt
-
-df = pd.read_csv("data/raw/heart.csv")
-print(df.columns)
-
 import pickle
-import pandas as pd
-from sklearn.model_selection import train_test_split
-from sklearn.preprocessing import StandardScaler
+
+from sklearn.base import BaseEstimator, TransformerMixin
+from sklearn.pipeline import Pipeline
+from sklearn.compose import ColumnTransformer
+from sklearn.preprocessing import StandardScaler, OneHotEncoder
 from sklearn.linear_model import LogisticRegression
 
-# Dataset
-df = pd.read_csv("data/raw/heart.csv")
+# 🔹 Özellik mühendisliği class'ı
+class FeatureEngineer(BaseEstimator, TransformerMixin):
+    def fit(self, X, y=None):
+        return self
+    def transform(self, X):
+        X = X.copy()
+        X["yas_grubu"] = pd.cut(X["age"], bins=[0,40,55,70,100], labels=["<40", "40-55", "56-70", ">70"])
+        X["oldpeak_yuksek"] = (X["oldpeak"] > 2.0).astype(int)
+        X["egim_flat_veya_down"] = X["slp"].isin([1, 2]).astype(int)
+        X["sessiz_gogus_agrisi"] = (X["cp"] == 4).astype(int)
+        X["thal_geri_donen_defekt"] = (X["thall"] == 2).astype(int)
+        X["exng_oldpeak_carpim"] = X["exng"] * X["oldpeak"]
+        X["thalach_age_orani"] = X["thalachh"] / X["age"]
+        X["risk_skoru_light"] = X["age"] + X["trtbps"] + X["chol"] + X["oldpeak"] - X["thalachh"]
+        return X
 
-# Sütun listeleri
-numeric_cols = ['age', 'trtbps', 'chol', 'thalachh', 'oldpeak']
-categorical_cols = ['sex', 'cp', 'fbs', 'restecg', 'exng', 'slp', 'caa', 'thall']
+# 🔹 Kullanılacak sütunlar
+numeric_cols = ["age", "trtbps", "chol", "thalachh", "oldpeak", 
+                "exng_oldpeak_carpim", "thalach_age_orani", "risk_skoru_light"]
 
-# One-hot encoding (drop_first=True)
-df_encoded = pd.get_dummies(df, columns=categorical_cols, drop_first=True)
+categorical_cols = ["sex", "cp", "fbs", "restecg", "exng", "slp", "caa", "thall", 
+                    "yas_grubu", "oldpeak_yuksek", "egim_flat_veya_down", 
+                    "sessiz_gogus_agrisi", "thal_geri_donen_defekt"]
 
-# X, y ayır
-X = df_encoded.drop(columns=["output"], axis=1)
-y = df_encoded["output"]
+# 🔹 Preprocessing adımı
+preprocessor = ColumnTransformer(transformers=[
+    ("num", StandardScaler(), numeric_cols),
+    ("cat", OneHotEncoder(drop="first", sparse_output=False, handle_unknown="ignore"), categorical_cols)
+])
 
-# Train/test split
-X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, random_state=42)
+# 🔹 Pipeline tanımı
+full_pipeline = Pipeline(steps=[
+    ("features", FeatureEngineer()),
+    ("preprocess", preprocessor),
+    ("classifier", LogisticRegression(
+        C=0.1,
+        l1_ratio=0.25,
+        penalty='elasticnet',
+        solver='saga',
+        max_iter=5000,
+        random_state=42
+    ))
+])
 
-# Sadece numeric sütunları scale et (önce one-hot sonrası sütun isimlerine bakalım)
-numeric_features = [col for col in X_train.columns if any(n in col for n in numeric_cols)]
-scaler = StandardScaler()
-X_train[numeric_features] = scaler.fit_transform(X_train[numeric_features])
+# 🔹 Veri yükleme
+df = pd.read_csv("heart.csv")
+X = df.drop(columns=["output"])
+y = df["output"]
 
-# Model
-model = LogisticRegression()
-model.fit(X_train, y_train)
+# 🔹 Eğit ve kaydet
+full_pipeline.fit(X, y)
 
-# Kaydet
-with open("models/model.pkl", "wb") as f:
-    pickle.dump(model, f)
-
-with open("models/scaler.pkl", "wb") as f:
-    pickle.dump(scaler, f)
-
-# Ayrıca sütun sırasını da kaydedelim (API prediction için gerekli!)
-with open("models/feature_order.pkl", "wb") as f:
-    pickle.dump(X_train.columns.tolist(), f)
+with open("pipeline.pkl", "wb") as f:
+    pickle.dump(full_pipeline, f)

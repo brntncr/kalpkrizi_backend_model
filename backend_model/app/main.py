@@ -33,21 +33,10 @@ logger = logging.getLogger(__name__)
 
 # 📦 Model files and helpers
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
-MODEL_PATH = os.path.join(BASE_DIR, "..", "models", "model.pkl")
-SCALER_PATH = os.path.join(BASE_DIR, "..", "models", "scaler.pkl")
-FEATURES_PATH = os.path.join(BASE_DIR, "..", "models", "feature_order.pkl")
+PIPELINE_PATH = os.path.join(BASE_DIR, "..", "models", "pipeline.pkl")
 
-with open(MODEL_PATH, "rb") as f:
-    model = pickle.load(f)
-
-with open(SCALER_PATH, "rb") as f:
-    scaler = pickle.load(f)
-
-with open(FEATURES_PATH, "rb") as f:
-    feature_order = pickle.load(f)
-
-NUMERIC_COLS = ['age', 'trtbps', 'chol', 'thalachh', 'oldpeak']
-CATEGORICAL_COLS = ['sex', 'cp', 'fbs', 'restecg', 'exng', 'slp', 'caa', 'thall']
+with open(PIPELINE_PATH, "rb") as f:
+    pipeline = pickle.load(f)
 
 # 🔹 DB setup
 DATABASE_URL = os.getenv("DATABASE_URL")
@@ -119,36 +108,24 @@ async def predict(
 
     input_dict = data.dict()
     df_input = pd.DataFrame([input_dict])
-    df_encoded = pd.get_dummies(df_input, columns=CATEGORICAL_COLS, drop_first=True)
 
-    for col in feature_order:
-        if col not in df_encoded.columns:
-            df_encoded[col] = 0
+    # 🔄 Artık preprocessing ve model tek bir pipeline içinde
+    pred = pipeline.predict(df_input)[0]
+    pred_proba = pipeline.predict_proba(df_input)[0][1]
 
-    df_encoded = df_encoded[feature_order]
-
-    numeric_features = [col for col in df_encoded.columns if any(n in col for n in NUMERIC_COLS)]
-    df_encoded[numeric_features] = scaler.transform(df_encoded[numeric_features])
-
-    pred = model.predict(df_encoded)[0]
-    pred_proba = model.predict_proba(df_encoded)[0][1]
-
-    # record = PredictionRecord(
-    #     age=data.age, sex=data.sex, cp=data.cp, trtbps=data.trtbps, chol=data.chol,
-    #     fbs=data.fbs, restecg=data.restecg, thalachh=data.thalachh, exng=data.exng,
-    #     oldpeak=data.oldpeak, slp=data.slp, caa=data.caa, thall=data.thall,
-    #     prediction=int(pred)
-    # )
+    # DB kaydı yapmak istersen bu alanı aktifleştir
+    # record = PredictionRecord(**input_dict, prediction=int(pred))
     # db.add(record)
     # db.commit()
 
     logger.info(f"Prediction: {pred} (probability: {pred_proba:.2%})")
 
     outcome = "Yüksek Risk" if pred == 1 else "Düşük Risk"
-    if pred == 1:
-        message = f"Yüksek kalp krizi riski tespit edildi (Güven: {pred_proba:.2%})"
-    else:
-        message = f"Düşük kalp krizi riski tahmin edildi (Güven: {1 - pred_proba:.2%})"
+    message = (
+        f"Yüksek kalp krizi riski tespit edildi (Güven: {pred_proba:.2%})"
+        if pred == 1 else
+        f"Düşük kalp krizi riski tahmin edildi (Güven: {1 - pred_proba:.2%})"
+    )
 
     explanation = None
     if explain:
